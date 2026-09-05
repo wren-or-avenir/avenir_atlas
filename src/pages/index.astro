@@ -1,17 +1,26 @@
 ---
-
+import '../styles/global.css';
 ---
 
-<html lang="en">
+<html lang="zh-CN">
 	<head>
 		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
 		<meta name="viewport" content="width=device-width" />
 		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" href="/favicon.ico" />
+		<title>Avenir Atlas</title>
+		<meta name="description" content="Avenir 的个人网站" />
 	</head>
 	<body>
-		<h1>Astro</h1>
+		<div id="stage"></div>
+		<script>
+			import { mountOceanGlobe } from '../components/webgl/mount';
+
+			const stage = document.getElementById('stage');
+			if (stage) {
+				mountOceanGlobe(stage);
+			}
+		</script>
 	</body>
 </html>

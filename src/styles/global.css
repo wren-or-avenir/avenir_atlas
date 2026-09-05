@@ -1,0 +1,31 @@
+:root {
+  --gold: #d4af37;
+  --gold-bright: #f0c75e;
+  --sea-day: #377477;
+  --sea-day-deep: #315553;
+  --sea-night: #07132a;
+  --sea-night-deep: #010508;
+  --biolume: #2da5e6;
+  --biolume-bright: #3db9f2;
+  --ink: #1c1c1c;
+  --paper: #f7f4ec;
+  --font-serif: 'Noto Serif SC', 'Songti SC', serif;
+  --font-sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: linear-gradient(180deg, var(--sea-day) 0%, var(--sea-day-deep) 100%);
+  font-family: var(--font-sans);
+}
+
+body[data-daynight='night'] {
+  background: linear-gradient(180deg, var(--sea-night) 0%, var(--sea-night-deep) 100%);
+}
+
+#stage canvas {
+  position: fixed;
+  inset: 0;
+  display: block;
+}

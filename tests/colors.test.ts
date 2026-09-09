@@ -30,10 +30,10 @@ function assertClose(actual: number, expected: number, epsilon = 1e-4): void {
 describe('resolveOceanLook', () => {
   it('晴天时返回参考图昼夜色板', () => {
     const day = resolveOceanLook('day', SUNNY);
-    assertClose(day.deep[0], 0.19);
-    assertClose(day.deep[1], 0.33);
-    assertClose(day.deep[2], 0.33);
-    assertClose(day.shallow[2], 0.47);
+    assertClose(day.deep[0], 0.03);
+    assertClose(day.deep[1], 0.35);
+    assertClose(day.deep[2], 0.49);
+    assertClose(day.shallow[2], 0.62);
     const night = resolveOceanLook('night', SUNNY);
     assertClose(night.deep[0], 0.004);
     assertClose(night.deep[2], 0.03);
@@ -43,9 +43,9 @@ describe('resolveOceanLook', () => {
 
   it('台风天气：降饱和降亮度', () => {
     const look = resolveOceanLook('day', TYPHOON);
-    assertClose(look.shallow[0], 0.2112);
-    assertClose(look.shallow[1], 0.2917);
-    assertClose(look.shallow[2], 0.2987);
+    assertClose(look.shallow[0], 0.3039);
+    assertClose(look.shallow[1], 0.3634);
+    assertClose(look.shallow[2], 0.3914);
     assertClose(look.glintStrength, 0.35);
   });
 

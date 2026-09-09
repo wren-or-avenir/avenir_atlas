@@ -8,10 +8,11 @@ import { createGlobeScene } from '../globe/globe';
 import { createStage } from './stage';
 
 const DAYNIGHT_REFRESH_MS = 60_000;
+const FORCE_DAY_NIGHT: 'day' | 'night' | null = 'day';
 
 export function mountOceanGlobe(container: HTMLElement): void {
   const refreshDayNight = (): void => {
-    document.body.dataset.daynight = getDayNight(new Date());
+    document.body.dataset.daynight = FORCE_DAY_NIGHT ?? getDayNight(new Date());
   };
   refreshDayNight();
   window.setInterval(refreshDayNight, DAYNIGHT_REFRESH_MS);
@@ -23,7 +24,7 @@ export function mountOceanGlobe(container: HTMLElement): void {
     container.classList.add('no-webgl');
     return;
   }
-  ocean.setDayNight(getDayNight(new Date()));
+  ocean.setDayNight(FORCE_DAY_NIGHT ?? getDayNight(new Date()));
 
   const site = resolveSiteConfig(import.meta.env);
   resolveWeatherProvider(toWeatherEnv(site))
@@ -42,6 +43,10 @@ export function mountOceanGlobe(container: HTMLElement): void {
   let lastTime = 0;
 
   window.addEventListener('pointermove', (event) => {
+    const WAKES_ENABLED = false;
+    if (!WAKES_ENABLED) {
+      return;
+    }
     const width = window.innerWidth;
     const height = window.innerHeight;
     const point = clientToLonLat(event.clientX, event.clientY, width, height);

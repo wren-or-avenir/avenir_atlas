@@ -10,19 +10,21 @@ export interface OceanLook {
   foamSmoothness: number;
   foamIntensity: number;
   sparkleStrength: number;
+  albedoStrength: number;
 }
 
-// 参考 docs/design/reference/ocean/ocean_day_07.jpg（青绿海面 + 稀疏白绿波光）
+// 参考 docs/design/reference/ocean/ocean_day_09.jpg（蓝色海面 + 白蓝波光）
 const DAY_LOOK: OceanLook = {
-  deep: [0.19, 0.33, 0.33],
-  shallow: [0.22, 0.45, 0.47],
-  crest: [0.76, 0.84, 0.83],
-  glint: [0.8, 0.87, 0.86],
+  deep: [0.03, 0.35, 0.49],
+  shallow: [0.37, 0.54, 0.62],
+  crest: [0.84, 0.88, 0.91],
+  glint: [0.87, 0.91, 0.93],
   glintStrength: 0.5,
-  foamThreshold: 1.15,
-  foamSmoothness: 0.5,
-  foamIntensity: 0.85,
+  foamThreshold: 1.0,
+  foamSmoothness: 0.4,
+  foamIntensity: 0.9,
   sparkleStrength: 0.12,
+  albedoStrength: 0.4,
 };
 
 // 参考 docs/design/reference/ocean/ocean_night_12.jpg（蓝眼泪：近黑海水 + 青色荧光）
@@ -32,10 +34,11 @@ const NIGHT_LOOK: OceanLook = {
   crest: [0.18, 0.65, 0.9],
   glint: [0.24, 0.73, 0.95],
   glintStrength: 0.4,
-  foamThreshold: 0.45,
-  foamSmoothness: 0.9,
+  foamThreshold: 0.55,
+  foamSmoothness: 0.7,
   foamIntensity: 1,
   sparkleStrength: 0.8,
+  albedoStrength: 0,
 };
 
 const GRAY_WEIGHTS: readonly [number, number, number] = [0.299, 0.587, 0.114];
@@ -52,6 +55,7 @@ export function resolveOceanLook(dayNight: DayNight, climate: ClimateParams): Oc
     foamSmoothness: base.foamSmoothness,
     foamIntensity: base.foamIntensity,
     sparkleStrength: base.sparkleStrength * climate.brightness,
+    albedoStrength: base.albedoStrength,
   };
 }
 

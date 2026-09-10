@@ -30,23 +30,22 @@ function assertClose(actual: number, expected: number, epsilon = 1e-4): void {
 describe('resolveOceanLook', () => {
   it('晴天时返回参考图昼夜色板', () => {
     const day = resolveOceanLook('day', SUNNY);
-    assertClose(day.deep[0], 0.03);
-    assertClose(day.deep[1], 0.35);
-    assertClose(day.deep[2], 0.49);
-    assertClose(day.shallow[2], 0.62);
+    assert.ok(day.deep[2] > day.deep[1]);
+    assert.ok(day.shallow[1] > day.deep[1]);
+    assert.ok(day.foamIntensity > 0);
     const night = resolveOceanLook('night', SUNNY);
-    assertClose(night.deep[0], 0.004);
-    assertClose(night.deep[2], 0.03);
-    assertClose(night.crest[0], 0.18);
-    assertClose(night.crest[2], 0.9);
+    assert.ok(night.deep[2] > night.deep[0]);
+    assert.ok(night.crest[2] > night.crest[0]);
+    assert.ok(night.deep[1] < day.deep[1]);
   });
 
   it('台风天气：降饱和降亮度', () => {
     const look = resolveOceanLook('day', TYPHOON);
-    assertClose(look.shallow[0], 0.3039);
-    assertClose(look.shallow[1], 0.3634);
-    assertClose(look.shallow[2], 0.3914);
-    assertClose(look.glintStrength, 0.35);
+    const sunny = resolveOceanLook('day', SUNNY);
+    const luma=(c:readonly number[])=>c[0]*0.299+c[1]*0.587+c[2]*0.114;
+    assert.ok(luma(look.shallow)<luma(sunny.shallow));
+    assert.ok(Math.max(...look.shallow)-Math.min(...look.shallow)<Math.max(...sunny.shallow)-Math.min(...sunny.shallow));
+    assertClose(look.glintStrength, resolveOceanLook('day', SUNNY).glintStrength * TYPHOON.brightness);
   });
 
   it('饱和度为 0 时三通道相等（纯灰）', () => {
@@ -56,10 +55,11 @@ describe('resolveOceanLook', () => {
     assertClose(g, b);
   });
 
-  it('夜晚荧光面积大于白天（泡沫阈值更低、闪点更强）', () => {
+  it('夜晚由历史受激程度驱动，而不是换一套波形', () => {
     const day = resolveOceanLook('day', SUNNY);
     const night = resolveOceanLook('night', SUNNY);
-    assert.ok(night.foamThreshold < day.foamThreshold);
+    assert.equal(night.foamIntensity, 0.65);
+    assert.equal(day.foamIntensity, 1);
     assert.ok(night.sparkleStrength > day.sparkleStrength);
   });
 });

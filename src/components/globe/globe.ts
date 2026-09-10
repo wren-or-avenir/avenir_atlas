@@ -45,5 +45,11 @@ export function createGlobeScene(): StageScene {
     update(dt) {
       spin.rotation.y += dt * SPIN_SPEED;
     },
+    dispose() {
+      geometry.dispose();
+      body.material.dispose();
+      wire.geometry.dispose();
+      wire.material.dispose();
+    },
   };
 }

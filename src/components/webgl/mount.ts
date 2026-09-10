@@ -1,81 +1,50 @@
 import { resolveWeatherParams, getDayNight } from '../../core/theme/theme';
 import { resolveWeatherProvider } from '../../core/weather';
-import { clientToLonLat } from '../../core/geo/projection';
-import { isInsideWorldOutline } from '../../core/geo/contour';
 import { resolveSiteConfig, toWeatherEnv } from '../../config/site';
 import { createOceanScene } from '../ocean/ocean';
 import { createGlobeScene } from '../globe/globe';
 import { createStage } from './stage';
 
 const DAYNIGHT_REFRESH_MS = 60_000;
-const FORCE_DAY_NIGHT: 'day' | 'night' | null = 'day';
 
 export function mountOceanGlobe(container: HTMLElement): void {
+  let disposed=false;
+  const ocean = createOceanScene();
   const refreshDayNight = (): void => {
-    document.body.dataset.daynight = FORCE_DAY_NIGHT ?? getDayNight(new Date());
+    const preview=import.meta.env.DEV ? new URLSearchParams(location.search).get('ocean') : null;
+    const value = preview==='day'||preview==='night' ? preview : getDayNight(new Date());
+    document.body.dataset.daynight = value;
+    ocean.setDayNight(value);
   };
   refreshDayNight();
-  window.setInterval(refreshDayNight, DAYNIGHT_REFRESH_MS);
+  const dayNightTimer = window.setInterval(refreshDayNight, DAYNIGHT_REFRESH_MS);
 
-  const ocean = createOceanScene();
   const globe = createGlobeScene();
-  const stage = createStage({ container, scenes: [ocean, globe] });
+  const stage = createStage({
+    container,
+    scenes: [ocean, globe],
+    onDispose: () => {disposed=true;window.clearInterval(dayNightTimer);},
+  });
   if (!stage) {
+    disposed=true;
+    window.clearInterval(dayNightTimer);
+    ocean.dispose?.();
+    globe.dispose?.();
     container.classList.add('no-webgl');
     return;
   }
-  ocean.setDayNight(FORCE_DAY_NIGHT ?? getDayNight(new Date()));
-
   const site = resolveSiteConfig(import.meta.env);
   resolveWeatherProvider(toWeatherEnv(site))
     .fetchCurrent()
     .then((input) => {
+      if(disposed) return;
       ocean.setClimate(resolveWeatherParams(input));
     })
     .catch((error) => {
+      if(disposed) return;
       console.warn('[weather] 获取失败，降级为默认气候参数', error);
       ocean.setClimate(resolveWeatherParams({ condition: 'sunny', windSpeed: 0 }));
     });
+  if(import.meta.hot) import.meta.hot.dispose(()=>stage.dispose());
 
-  let hasLastMove = false;
-  let lastX = 0;
-  let lastY = 0;
-  let lastTime = 0;
-
-  window.addEventListener('pointermove', (event) => {
-    const WAKES_ENABLED = false;
-    if (!WAKES_ENABLED) {
-      return;
-    }
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-    const point = clientToLonLat(event.clientX, event.clientY, width, height);
-    if (isInsideWorldOutline(point.lon, point.lat)) {
-      hasLastMove = false;
-      return;
-    }
-    const x = (event.clientX / width) * 2 - 1;
-    const y = -((event.clientY / height) * 2 - 1);
-    const now = performance.now();
-    if (!hasLastMove) {
-      lastX = x;
-      lastY = y;
-      lastTime = now;
-      hasLastMove = true;
-      return;
-    }
-    const dtSec = Math.max((now - lastTime) / 1000, 1e-3);
-    const dx = x - lastX;
-    const dy = y - lastY;
-    const dist = Math.hypot(dx, dy);
-    if (dist < 0.01) {
-      return;
-    }
-    const speed = dist / dtSec;
-    const strength = Math.min(1.2, Math.max(0.4, 0.5 + speed * 0.8));
-    ocean.pushWakePoint({ x, y, dirX: dx / dist, dirY: dy / dist, strength });
-    lastX = x;
-    lastY = y;
-    lastTime = now;
-  });
 }

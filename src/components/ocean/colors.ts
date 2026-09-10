@@ -6,39 +6,30 @@ export interface OceanLook {
   crest: readonly [number, number, number];
   glint: readonly [number, number, number];
   glintStrength: number;
-  foamThreshold: number;
-  foamSmoothness: number;
   foamIntensity: number;
   sparkleStrength: number;
-  albedoStrength: number;
 }
 
-// 参考 docs/design/reference/ocean/ocean_day_09.jpg（蓝色海面 + 白蓝波光）
+// 参考 day07/day11：清透热带水体、局部破浪；这些是 sRGB 视觉起点。
 const DAY_LOOK: OceanLook = {
-  deep: [0.03, 0.35, 0.49],
-  shallow: [0.37, 0.54, 0.62],
-  crest: [0.84, 0.88, 0.91],
-  glint: [0.87, 0.91, 0.93],
-  glintStrength: 0.5,
-  foamThreshold: 1.0,
-  foamSmoothness: 0.4,
-  foamIntensity: 0.9,
-  sparkleStrength: 0.12,
-  albedoStrength: 0.4,
+  deep: [0.025, 0.21, 0.33],
+  shallow: [0.025, 0.69, 0.66],
+  crest: [0.92, 0.96, 0.94],
+  glint: [0.76, 0.93, 0.95],
+  glintStrength: 0.28,
+  foamIntensity: 1,
+  sparkleStrength: 0.08,
 };
 
-// 参考 docs/design/reference/ocean/ocean_night_12.jpg（蓝眼泪：近黑海水 + 青色荧光）
+// 参考 night05/night11：近黑水体与局部蓝眼泪。
 const NIGHT_LOOK: OceanLook = {
-  deep: [0.004, 0.02, 0.03],
-  shallow: [0.03, 0.07, 0.16],
-  crest: [0.18, 0.65, 0.9],
-  glint: [0.24, 0.73, 0.95],
-  glintStrength: 0.4,
-  foamThreshold: 0.55,
-  foamSmoothness: 0.7,
-  foamIntensity: 1,
-  sparkleStrength: 0.8,
-  albedoStrength: 0,
+  deep: [0.001, 0.004, 0.012],
+  shallow: [0.008, 0.035, 0.11],
+  crest: [0.71, 0.97, 1],
+  glint: [0.02, 0.55, 0.94],
+  glintStrength: 0.15,
+  foamIntensity: 0.65,
+  sparkleStrength: 1.2,
 };
 
 const GRAY_WEIGHTS: readonly [number, number, number] = [0.299, 0.587, 0.114];
@@ -51,11 +42,8 @@ export function resolveOceanLook(dayNight: DayNight, climate: ClimateParams): Oc
     crest: shade(base.crest, climate),
     glint: shade(base.glint, climate),
     glintStrength: base.glintStrength * climate.brightness,
-    foamThreshold: base.foamThreshold,
-    foamSmoothness: base.foamSmoothness,
     foamIntensity: base.foamIntensity,
     sparkleStrength: base.sparkleStrength * climate.brightness,
-    albedoStrength: base.albedoStrength,
   };
 }
 

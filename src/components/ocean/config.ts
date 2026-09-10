@@ -1,21 +1,21 @@
 export interface OceanConfig {
-  waveAmplitude: number;
-  waveSpeed: number;
-  segmentCount: number;
-  wakeLife: number;
-  wakeWidth: number;
-  wakeWaveLen: number;
-  wakeMinStep: number;
-  wakeMaxStrength: number;
+  eventIntervalMin: number;
+  eventIntervalMax: number;
+  largeEventIntervalMin: number;
+  largeEventIntervalMax: number;
+  historyFoamTau: number;
+  historyGlowTau: number;
+  historyAerationTau: number;
+  maxHistorySteps: number;
 }
 
 export const DEFAULT_OCEAN_CONFIG: Readonly<OceanConfig> = {
-  waveAmplitude: 0.2,
-  waveSpeed: 1,
-  segmentCount: 256,
-  wakeLife: 2.5,
-  wakeWidth: 0.07,
-  wakeWaveLen: 0.16,
-  wakeMinStep: 0.01,
-  wakeMaxStrength: 1.2,
+  eventIntervalMin: 4,
+  eventIntervalMax: 7,
+  largeEventIntervalMin: 20,
+  largeEventIntervalMax: 40,
+  historyFoamTau: 4,
+  historyGlowTau: 1,
+  historyAerationTau: 2,
+  maxHistorySteps: 3,
 };

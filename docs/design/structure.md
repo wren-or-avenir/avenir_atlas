@@ -1,6 +1,6 @@
 # Avenir Atlas - 项目目录结构说明
 
-本文档定义 Avenir Atlas 的目标目录结构，基于[开发圣经](development_bible.md)的分层原则，结合 [content.md](content.md) 与 [visual_design.md](visual_design.md) 的需求规划。当前仓库仍在按此结构建设，未标注的实现目录暂未创建。
+本文档定义 Avenir Atlas 的目标目录结构，遵循[开发工作流](development_bible.md)，结合 [content.md](content.md) 与 [visual_design.md](visual_design.md) 的需求规划。当前仓库仍在按此结构建设，未标注的实现目录暂未创建。
 
 ## 目录结构总览
 
@@ -99,6 +99,7 @@ Notion 文本 → sync-notion.ts 拉取并转换 → content/ 落盘 → Content
 ### 渲染架构
 
 - **单一 WebGL 上下文**：海洋背景与 3D 地球共用一个 renderer、一个 `requestAnimationFrame` 循环，通过 `gl.scissor` 切分视口（全屏海洋 + 左上角地球），避免多上下文抢占 GPU，双端联动状态同步也更简单。
+  场景可通过 `beforeRender` 更新离屏历史纹理，但必须恢复 renderer 状态；叠加场景绘制前清除深度。场景资源由可选 `dispose` 统一清理。
 - **2D 地图不碰 WebGL**：完全用 SVG + CSS 动画实现（金色线条、呼吸灯、倒三角）。
 - **气候图层用 CSS/SVG**：雨丝、雷电等由 `core/theme` 的天气参数驱动（倾角、频率、饱和度），不占 WebGL 预算。
 

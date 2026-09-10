@@ -6,7 +6,9 @@ export interface StageScene {
   readonly camera: Camera;
   readonly rect: () => Rect;
   update: (dt: number) => void;
+  beforeRender?: (renderer: WebGLRenderer, dt: number) => void;
   onResize?: (size: Size) => void;
+  dispose?: () => void;
 }
 
 export interface Stage {
@@ -77,8 +79,12 @@ export function createStage(options: {
     cancelAnimationFrame(frameId);
     window.removeEventListener('resize', handleResize);
     canvas.removeEventListener('webglcontextlost', handleContextLost);
+    for (const entry of scenes) {
+      entry.dispose?.();
+    }
     renderer.dispose();
     canvas.remove();
+    shaderErrorOverlay.remove();
     onDispose?.();
   };
 
@@ -101,11 +107,13 @@ export function createStage(options: {
 
     let first = true;
     for (const entry of scenes) {
+      entry.beforeRender?.(renderer, dt);
       const rect = toGLCoords(entry.rect(), size.height);
       renderer.setViewport(rect.x, rect.y, rect.w, rect.h);
       renderer.setScissor(rect.x, rect.y, rect.w, rect.h);
       renderer.setScissorTest(true);
       renderer.autoClear = first;
+      if(!first) renderer.clearDepth();
       renderer.render(entry.scene, entry.camera);
       first = false;
     }

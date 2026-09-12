@@ -4,6 +4,9 @@ import {
   DataTexture,
   LinearFilter,
   HalfFloatType,
+  FloatType,
+  NearestFilter,
+  RedFormat,
   Mesh,
   NoColorSpace,
   OrthographicCamera,
@@ -22,6 +25,7 @@ import type { StageScene } from '../webgl/stage';
 import { oceanRect, type Size } from '../webgl/viewport';
 import { DEFAULT_OCEAN_CONFIG } from './config';
 import { resolveOceanLook } from './colors';
+import { TRAVEL_SAMPLES, TRAVEL_MIN_Y, TRAVEL_MAX_Y, writeTravelProfile } from './propagation';
 import vertexShader from './shaders/ocean.vert.glsl?raw';
 import fragmentShader from './shaders/ocean.frag.glsl?raw';
 import historyFragmentShader from './shaders/history.frag.glsl?raw';
@@ -55,6 +59,7 @@ interface WaveEvent {
 
 export function createOceanScene(): OceanScene {
   const config = DEFAULT_OCEAN_CONFIG;
+  const singleWavePreview = import.meta.env.DEV && new URLSearchParams(window.location.search).get('take') === 'breaker';
   const camera = new OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
   camera.position.z = 2;
   const geometry = new PlaneGeometry(2, 2, 1, 1);
@@ -63,9 +68,21 @@ export function createOceanScene(): OceanScene {
   blackFallback.colorSpace = NoColorSpace;
   blackFallback.needsUpdate = true;
 
+  const travelData = new Float32Array(TRAVEL_SAMPLES * EVENT_COUNT);
+  const travelTexture = new DataTexture(travelData, TRAVEL_SAMPLES, EVENT_COUNT, RedFormat, FloatType);
+  // Manual interpolation in GLSL avoids requiring float-linear filtering support.
+  travelTexture.minFilter = travelTexture.magFilter = NearestFilter;
+  travelTexture.colorSpace = NoColorSpace;
+  const travelUniforms = {
+    uTravel: { value: travelTexture },
+    uTravelSize: { value: new Vector2(TRAVEL_SAMPLES, EVENT_COUNT) },
+    uTravelRange: { value: new Vector2(TRAVEL_MIN_Y, TRAVEL_MAX_Y) },
+  };
+
   const eventUniforms = Array.from({ length: EVENT_COUNT }, () => new Vector4(0, 1.2, 0, 0));
   const eventParams = Array.from({ length: EVENT_COUNT }, () => new Vector4(1e6, 0.06, 0.08, 1));
   const uniforms = {
+    ...travelUniforms,
     uTime: { value: 0 },
     uWorldSize: { value: new Vector2(16, 40) },
     uNight: { value: 0 },
@@ -93,6 +110,7 @@ export function createOceanScene(): OceanScene {
   const historyCamera = new OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
   historyCamera.position.z = 2;
   const historyUniforms = {
+    ...travelUniforms,
     uWorldSize: { value: uniforms.uWorldSize.value },
     uSeaState: uniforms.uSeaState,
     uHistory: { value: blackFallback },
@@ -141,10 +159,12 @@ export function createOceanScene(): OceanScene {
       centerX: (random()-0.5)*36,
       speed: (large ? 2.5 : 1.8) + random()*0.4,
       width: large ? 14+random()*10 : 7+random()*10,
-      strength: large ? 0.9 + random() * 0.45 : 0.45 + random() * 0.4,
+      strength: singleWavePreview ? 1.35 : large ? 0.9 + random() * 0.45 : 0.45 + random() * 0.4,
       life: 48,
       kind: random()*40,
     };
+    writeTravelProfile(travelData, slot, 8 + events[slot].strength * 8);
+    travelTexture.needsUpdate = true;
   };
 
   const reset = (): void => {
@@ -154,9 +174,16 @@ export function createOceanScene(): OceanScene {
     nextEventAt=4;
     nextLargeEventAt=24;
     events.fill(null);
-    spawnEvent(0,-17);
-    spawnEvent(1,-11);
-    spawnEvent(0,-4);
+    if(singleWavePreview) {
+      spawnEvent(1,0);
+      events[0]!.centerX=0;
+      events[0]!.width=30;
+      nextEventAt=nextLargeEventAt=Infinity;
+    } else {
+      spawnEvent(0,-17);
+      spawnEvent(1,-11);
+      spawnEvent(0,-4);
+    }
     historyNeedsClear=true;
     uniforms.uTime.value=0;
   };
@@ -260,7 +287,7 @@ export function createOceanScene(): OceanScene {
       gui.add(controls,'mode',['day','night']).onChange((v:DayNight)=>{
         dayNight=v;applyLook();document.body.dataset.daynight=v;
       });
-      gui.add(controls,'pause').onChange((v:boolean)=>{paused=v;pendingTime=0;});
+      gui.add(controls,'pause').onChange((v:boolean)=>{paused=v;});
       gui.add(controls,'reset');
       gui.add(controls,'view',{water:0,depth:1,normal:2,breaking:3,history:4})
         .onChange((v:number)=>{uniforms.uDebug.value=Number(v);});
@@ -314,9 +341,10 @@ export function createOceanScene(): OceanScene {
         steps++;
       }
       if (steps === config.maxHistorySteps && pendingTime >= FIXED_STEP) pendingTime = 0;
-      uniforms.uTime.value = simulationTime;
+      // Render between history ticks; pausing retains this fractional time.
+      uniforms.uTime.value = simulationTime + pendingTime;
       uniforms.uHistory.value = historyTargets[historyRead].texture;
-      if(import.meta.env.DEV) renderer.domElement.dataset.oceanTime=simulationTime.toFixed(3);
+      if(import.meta.env.DEV) renderer.domElement.dataset.oceanTime=uniforms.uTime.value.toFixed(3);
       } finally {
       restoreRendererState(renderer, previousTarget, viewport, scissor, scissorTest, autoClear);
       renderer.setClearColor(clearColor,clearAlpha);
@@ -324,7 +352,8 @@ export function createOceanScene(): OceanScene {
     },
     onResize(size) {
       updateWorldSize(size);
-      const scale=Math.min(0.5*Math.min(window.devicePixelRatio||1,2),1024/Math.max(size.width,size.height));
+      // Density history does not need Retina pixels; fine foam is shaded at full size.
+      const scale=Math.min(0.5,1024/Math.max(size.width,size.height));
       const width = Math.max(1,Math.round(size.width*scale));
       const height = Math.max(1,Math.round(size.height*scale));
       if (!historyTargets || historyTargets[0].width !== width || historyTargets[0].height !== height) {
@@ -339,6 +368,7 @@ export function createOceanScene(): OceanScene {
       material.dispose();
       historyMaterial.dispose();
       blackFallback.dispose();
+      travelTexture.dispose();
     },
     setDayNight(value) {
       dayNight = value;

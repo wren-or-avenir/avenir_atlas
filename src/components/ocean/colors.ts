@@ -10,10 +10,10 @@ export interface OceanLook {
   sparkleStrength: number;
 }
 
-// 参考 day07/day11：清透热带水体、局部破浪；这些是 sRGB 视觉起点。
+// 深水向 day09 的饱和蓝青靠拢；浅岸保持青绿，均为 sRGB 艺术初值。
 const DAY_LOOK: OceanLook = {
-  deep: [0.025, 0.21, 0.33],
-  shallow: [0.025, 0.69, 0.66],
+  deep: [0.008, 0.30, 0.46],
+  shallow: [0.015, 0.76, 0.68],
   crest: [0.92, 0.96, 0.94],
   glint: [0.76, 0.93, 0.95],
   glintStrength: 0.28,

@@ -16,6 +16,8 @@ export interface Stage {
 }
 
 const MAX_FRAME_DT = 0.1;
+const FRAME_INTERVAL_MS = 1000 / 60;
+const MAX_RENDER_PIXELS = 1600 * 1000;
 
 export function createStage(options: {
   container: HTMLElement;
@@ -34,7 +36,6 @@ export function createStage(options: {
   }
 
   const { container, scenes, onDispose } = options;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   const canvas = renderer.domElement;
   container.appendChild(canvas);
 
@@ -59,6 +60,9 @@ export function createStage(options: {
 
   const handleResize = (): void => {
     const size = currentSize();
+    // Bound background cost on Retina/4K displays; CSS layout keeps its native size.
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1,
+      Math.sqrt(MAX_RENDER_PIXELS / Math.max(1,size.width*size.height))));
     renderer.setSize(size.width, size.height);
     for (const entry of scenes) {
       entry.onResize?.(size);
@@ -93,10 +97,18 @@ export function createStage(options: {
   handleResize();
 
   let last = performance.now();
+  let nextFrameAt = last;
+  let renderedFrames = 0;
   const frame = (now: number): void => {
     if (disposed) {
       return;
     }
+    if(now < nextFrameAt) {
+      frameId = requestAnimationFrame(frame);
+      return;
+    }
+    // Keep the cadence without catch-up renders; dt still uses real elapsed time.
+    nextFrameAt = now + FRAME_INTERVAL_MS - (now-nextFrameAt)%FRAME_INTERVAL_MS;
     const dt = Math.min((now - last) / 1000, MAX_FRAME_DT);
     last = now;
 
@@ -119,6 +131,7 @@ export function createStage(options: {
     }
     renderer.setScissorTest(false);
     renderer.autoClear = true;
+    if(import.meta.env.DEV) canvas.dataset.stageFrame=String(++renderedFrames);
 
     frameId = requestAnimationFrame(frame);
   };

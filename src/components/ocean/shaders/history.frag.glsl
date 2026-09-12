@@ -16,6 +16,7 @@ void main() {
   // Half-float history preserves the thin tail instead of draining it every frame.
   vec3 state=old*decay;
   state*=step(vec3(0.0001),state);
-  state+=vec3(2.8,8.0,3.0)*source*uDt;
+  // Saturating injection leaves room for the tail's thickness to keep changing.
+  state+=(1.0-state)*vec3(4.0,8.0,3.0)*source*uDt;
   gl_FragColor=vec4(clamp(state,0.0,1.0),1);
 }

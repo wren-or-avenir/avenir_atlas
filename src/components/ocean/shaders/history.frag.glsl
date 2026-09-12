@@ -13,8 +13,9 @@ void main() {
     old=texture2D(uHistory,previous).rgb;
   vec3 decay=exp(-uDt/vec3(uFoamTau,uGlowTau,uAerationTau));
   float source=breaker(vWorld).x;
-  // Only the narrow breaking front injects state: no broad moving light curtain.
-  vec3 state=max(old*decay-vec3(1.0/255.0),vec3(0));
-  state+=vec3(7.0,11.0,4.5)*source*uDt;
+  // Half-float history preserves the thin tail instead of draining it every frame.
+  vec3 state=old*decay;
+  state*=step(vec3(0.0001),state);
+  state+=vec3(2.8,8.0,3.0)*source*uDt;
   gl_FragColor=vec4(clamp(state,0.0,1.0),1);
 }

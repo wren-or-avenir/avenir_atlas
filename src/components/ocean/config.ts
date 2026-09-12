@@ -14,8 +14,8 @@ export const DEFAULT_OCEAN_CONFIG: Readonly<OceanConfig> = {
   eventIntervalMax: 7,
   largeEventIntervalMin: 20,
   largeEventIntervalMax: 40,
-  historyFoamTau: 4,
-  historyGlowTau: 1,
+  historyFoamTau: 5.5,
+  historyGlowTau: 1.6,
   historyAerationTau: 2,
   maxHistorySteps: 3,
 };

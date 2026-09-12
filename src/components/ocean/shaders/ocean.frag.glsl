@@ -22,10 +22,6 @@ void main() {
   vec3 w=waves(p);
   vec3 b=breaker(p);
   vec2 slope=w.yz;
-  vec2 rippleP=p*2.1+vec2(uTime*0.12,uTime*0.24);
-  float ripple=fbm(rippleP);
-  slope+=vec2(fbm(rippleP+vec2(0.05,0))-ripple,
-              fbm(rippleP+vec2(0,0.05))-ripple)*2.2;
   // Crest face participates in the normal, not just an unrelated white overlay.
   slope += vec2(breaker(p+vec2(0.06,0)).z-b.z,
                 breaker(p+vec2(0,0.06)).z-b.z)/0.06;
@@ -34,13 +30,15 @@ void main() {
   vec2 bottomP=p+normal.xy*min(depth,4.0)*0.25;
   float rock=reef(bottomP);
   float grain=fbm(bottomP*1.5);
-  vec3 bottom=linearColor(mix(vec3(0.53,0.55,0.36),vec3(0.23,0.22,0.12),rock));
+  float mineral=smoothstep(0.25,0.75,fbm(bottomP*0.55+17.0));
+  vec3 stone=mix(vec3(0.19,0.27,0.22),vec3(0.48,0.31,0.16),mineral);
+  vec3 bottom=linearColor(mix(vec3(0.53,0.55,0.36),stone,rock));
   float crag=smoothstep(0.32,0.67,fbm(bottomP*3.0));
   bottom *= 0.55+0.75*crag;
   vec2 caustic=foamPattern(bottomP*1.8+normal.xy*2.0);
   bottom+=vec3(0.07,0.095,0.055)*caustic.x*(0.3+grain);
   // Exponential absorption hides the seabed in deep water.
-  vec3 transmission=exp(-vec3(0.48,0.19,0.12)*depth);
+  vec3 transmission=exp(-vec3(0.48,0.19,0.12)*depth*mix(0.78,1.0,smoothstep(1.0,5.0,depth)));
   float shallow=exp(-depth*0.24);
   vec3 water=mix(linearColor(uDeep),linearColor(uShallow),shallow);
   water=water*(1.0-transmission*0.8)+bottom*transmission*0.8*(1.0-uNight);
@@ -50,6 +48,9 @@ void main() {
   water+=linearColor(uGlint)*sun*uGlintStrength*(1.0-uNight)*0.38;
   water*=0.72+0.35*max(dot(normal,normalize(vec3(-0.4,0.3,0.9))),0.0);
   water*=1.0+(w.x*0.55+normal.y*0.16)*(1.0-uNight*0.6);
+  // The steep shore-facing wall occludes light; the long back slope stays softer.
+  float faceShade=smoothstep(0.08,0.9,slope.y)*clamp(b.z,0.0,1.0);
+  water*=1.0-faceShade*0.32;
 
   vec3 history=texture2D(uHistory,vUv).rgb;
   vec2 flowP=p+vec2(0.08,0.48)*uTime;
@@ -58,18 +59,23 @@ void main() {
   float speckle=noise(flowP*29.0);
   float density=clamp(history.r,0.0,1.0);
   // Fresh foam clumps, fine connected residual walls, and exposed water holes.
-  float fresh=b.x*smoothstep(0.22,0.62,fbm(flowP*12.0));
+  float clumps=fbm(foamP*5.0);
+  float fresh=b.x*mix(0.65,1.0,smoothstep(0.22,0.65,clumps));
   float fragments=smoothstep(0.28,0.62,fbm(flowP*4.0));
-  float residual=density*mix(lace.x*fragments,smoothstep(0.16,0.42,lace.y),smoothstep(0.35,0.85,density));
+  float residual=density*mix(lace.x*fragments*1.8,
+    smoothstep(0.30,0.65,lace.y+clumps*0.15),smoothstep(0.15,0.85,density));
   residual+=density*0.12*smoothstep(0.66,0.8,speckle);
   float foam=clamp(fresh*0.95+residual,0.0,0.97);
   float aeration=clamp(history.b*0.4+b.y*0.09,0.0,0.4);
   water=mix(water,linearColor(vec3(0.16,0.58,0.62)),aeration*(1.0-uNight));
-  vec3 white=linearColor(uFoamColor)*(0.76+0.24*speckle);
+  vec2 foamSlope=vec2(dFdx(clumps),dFdy(clumps))*18.0;
+  float foamLight=0.65+0.35*max(dot(normalize(vec3(-foamSlope,1.0)),normalize(vec3(-0.4,0.3,0.9))),0.0);
+  vec3 white=mix(linearColor(vec3(0.34,0.53,0.57)),linearColor(uFoamColor),foamLight);
+  white*=0.9+0.1*speckle;
   water=mix(water,white,foam*(1.0-uNight*0.98));
 
   float excited=clamp(history.g+b.x*0.65,0.0,1.0);
-  float luminous=excited*clamp(fresh+residual*1.3,0.0,1.0);
+  float luminous=excited*clamp(fresh+residual*1.3,0.0,1.0)*foamLight;
   float halo=0.0;
   halo+=texture2D(uHistory,vUv+uHistoryTexel*vec2(3,0)).g;
   halo+=texture2D(uHistory,vUv-uHistoryTexel*vec2(3,0)).g;

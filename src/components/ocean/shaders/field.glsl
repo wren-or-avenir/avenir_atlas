@@ -18,12 +18,13 @@ vec2 random2(vec2 p) {
 }
 float noise(vec2 p) {
   vec2 i = floor(p), f = fract(p);
-  vec2 u = f * f * (3.0 - 2.0 * f);
+  vec2 u = f*f*f*(f*(f*6.0-15.0)+10.0);
   return mix(mix(random2(i).x, random2(i + vec2(1,0)).x, u.x),
     mix(random2(i + vec2(0,1)).x, random2(i + 1.0).x, u.x), u.y);
 }
 float fbm(vec2 p) {
-  return noise(p)*0.57 + noise(p*2.07+9.3)*0.28 + noise(p*4.13+21.7)*0.15;
+  mat2 turn=mat2(0.8,-0.6,0.6,0.8);
+  return noise(p)*0.57 + noise(turn*p*2.07+9.3)*0.28 + noise(turn*turn*p*4.13+21.7)*0.15;
 }
 // Stationary submerged relief in aspect-correct world coordinates.
 float reef(vec2 p) {
@@ -31,24 +32,42 @@ float reef(vec2 p) {
   float clusters = fbm(p*0.18 + vec2(8.0, 2.0));
   return shelf * smoothstep(0.47, 0.58, clusters + 0.09*noise(p*1.4));
 }
+float shelfDepth(float y) {
+  return mix(1.4,13.0,smoothstep(-17.0,13.0,y));
+}
 float depthAt(vec2 p) {
-  float base = mix(1.4, 13.0, smoothstep(-17.0, 13.0, p.y));
+  float base = shelfDepth(p.y);
   return max(0.45, base - 1.2*reef(p) + 0.5*(fbm(p*0.15)-0.5));
+}
+float speedRatio(float depth, float wavelength) {
+  return sqrt(tanh(6.2831853*depth/wavelength));
+}
+// Integrate travel time, so slowing fronts compress without speed*time tearing.
+// ponytail: parallel shelf rays, local reef bending below; full refraction needs a 2D travel-time field.
+float travelDistance(float y, float wavelength) {
+  float distance=24.0-y;
+  float total=1.0/speedRatio(shelfDepth(y),wavelength)+1.0/speedRatio(shelfDepth(24.0),wavelength);
+  for(int j=1;j<16;j++) {
+    float sampleY=y+distance*float(j)/16.0;
+    total+=(j%2==0?2.0:4.0)/speedRatio(shelfDepth(sampleY),wavelength);
+  }
+  return distance*total/48.0;
 }
 // height, d(height)/dx, d(height)/dy in the same units; no epsilon omission.
 vec3 waves(vec2 p) {
   vec3 w = vec3(0.0);
-  vec2 drift=p*0.65+vec2(uTime*0.035,uTime*0.075);
-  float warp=fbm(drift)*3.5;
-  vec2 warpGrad=vec2(fbm(drift+vec2(0.03,0)),fbm(drift+vec2(0,0.03)));
-  warpGrad=(warpGrad*3.5-warp)/0.03*0.65;
-  for (int i=0; i<8; i++) {
+  for (int i=0; i<10; i++) {
     float f = float(i);
     float k = 0.8*pow(1.72,f);
     vec2 dir = i<2 ? normalize(vec2(sin(f*2.4)*0.7,-1.0)) : vec2(sin(f*2.4),cos(f*2.4));
-    float phase = dot(p,dir)*k - uTime*sqrt(9.81*k)*0.42 + f*3.1+warp;
+    vec2 drift=p*(0.12+f*0.027)+vec2(f*7.3,uTime*0.045);
+    float modulation=noise(drift);
+    vec2 grad=(vec2(noise(drift+vec2(0.025,0)),noise(drift+vec2(0,0.025)))-modulation)/0.025*(0.12+f*0.027);
+    float phase = dot(p,dir)*k - uTime*sqrt(9.81*k)*0.42 + f*3.1+modulation*4.0;
     float a = 0.16*pow(0.48,f);
-    w += vec3(sin(phase), cos(phase)*(k*dir+warpGrad)) * a;
+    a*=1.0-smoothstep(1.0,3.0,k*length(fwidth(p)));
+    float amplitude=0.45+modulation;
+    w += vec3(sin(phase)*amplitude, cos(phase)*(k*dir+grad*4.0)*amplitude+sin(phase)*grad) * a;
   }
   return w*uSeaState;
 }
@@ -66,18 +85,27 @@ vec3 breaker(vec2 p) {
     float x = p.x-e.x;
     float envelope = 1.0-smoothstep(param.z*0.55,param.z,abs(x));
     float seed = e.w;
-    float front = e.y-age*param.y + 0.9*sin(x*0.32+seed)
-      + 0.32*sin(x*1.2+seed*3.0) + 0.14*sin(x*3.7+seed)
-      + 0.85*relief;
-    float q = p.y-front;
-    float jagged = (fbm(vec2(x*2.2,seed+age*0.12))-0.5)*0.24;
-    float width = mix(0.14,0.38,smoothstep(0.7,1.5,e.z));
-    float core = 1.0-smoothstep(width*0.2,width,abs(q+jagged));
-    float segments = smoothstep(0.25,0.53,fbm(vec2(x*0.55,seed+age*0.10)));
-    float breaking = clamp(e.z*0.6 + relief*0.8 + (6.0-depth)*0.07,0.0,1.3);
-    result.x += core*envelope*segments*breaking*uSeaState;
-    result.y += exp(-pow((q+0.36)/0.6,2.0))*envelope*e.z;
-    result.z += exp(-pow(q/0.65,2.0))*envelope*0.18*e.z;
+    float wavelength=8.0+e.z*8.0;
+    float c=speedRatio(shelfDepth(p.y),wavelength);
+    float lobes=fbm(vec2(x*0.38,seed+age*0.035));
+    float bend=(lobes-0.5)*4.0+0.22*sin(x*1.7+seed)+0.65*relief;
+    float q=(age*param.y-travelDistance(p.y,wavelength))*c-bend;
+    float height=2.0*e.z*uSeaState/sqrt(c)*(0.65+lobes*0.65);
+    float breaking=max(smoothstep(0.60,0.82,height/depth),
+      smoothstep(0.13,0.17,height/(wavelength*c)));
+    // Breakers release energy; the shallow face cannot grow without bound.
+    height=min(height,0.78*depth);
+    float width=mix(0.16,0.85,breaking)*mix(0.65,1.25,lobes)*sqrt(e.z);
+    float jagged=(fbm(vec2(x*2.2,seed+age*0.12))-0.5)*width;
+    float core=1.0-smoothstep(width*0.25,width,abs(q+jagged-width*0.25));
+    float segments=smoothstep(0.24,0.57,lobes);
+    float fade=1.0-smoothstep(param.w-4.0,param.w,age);
+    envelope*=fade;
+    result.x+=core*envelope*segments*breaking;
+    float faceWidth=mix(0.95,0.32,breaking);
+    float profile=exp(-pow(q/(q<0.0?faceWidth:1.8+e.z),2.0));
+    result.y+=profile*envelope*height*breaking;
+    result.z+=profile*envelope*height*0.35;
   }
   return result;
 }

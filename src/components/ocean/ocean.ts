@@ -3,6 +3,7 @@ import {
   Color,
   DataTexture,
   LinearFilter,
+  HalfFloatType,
   Mesh,
   NoColorSpace,
   OrthographicCamera,
@@ -10,7 +11,6 @@ import {
   RGBAFormat,
   Scene,
   ShaderMaterial,
-  UnsignedByteType,
   Vector2,
   Vector4,
   WebGLRenderTarget,
@@ -139,10 +139,10 @@ export function createOceanScene(): OceanScene {
     events[slot] = {
       start,
       centerX: (random()-0.5)*36,
-      speed: 1.7 + random()*0.8,
+      speed: (large ? 2.5 : 1.8) + random()*0.4,
       width: large ? 14+random()*10 : 7+random()*10,
       strength: large ? 0.9 + random() * 0.45 : 0.45 + random() * 0.4,
-      life: 36,
+      life: 48,
       kind: random()*40,
     };
   };
@@ -205,7 +205,7 @@ export function createOceanScene(): OceanScene {
       wrapS: ClampToEdgeWrapping,
       wrapT: ClampToEdgeWrapping,
       format: RGBAFormat,
-      type: UnsignedByteType,
+      type: HalfFloatType,
       depthBuffer: false,
       stencilBuffer: false,
     } as const;
